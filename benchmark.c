@@ -215,7 +215,7 @@ static void stop(const char* name) {
   fflush(stderr);
 }
 
-void benchmark_init() {
+void benchmark_init(long unused) {
   db_ = NULL;
   db_num_ = 0;
   num_ = FLAGS_num;
@@ -239,12 +239,12 @@ void benchmark_init() {
   closedir(test_dir);
 }
 
-void benchmark_fini() {
+void benchmark_fini(long unused) {
   int status = sqlite3_close(db_);
   error_check(status);
 }
 
-void benchmark_run() {
+void benchmark_run(long unused) {
   print_header();
   benchmark_open();
 
@@ -548,4 +548,15 @@ void benchmark_read(int order, int entries_per_batch) {
   error_check(status);
   status = sqlite3_finalize(end_trans_stmt);
   error_check(status);
+}
+
+void cond_kerncall(int cond, void (*func)(long), long arg)
+{
+#ifdef KERNCALL
+  if (cond)
+    kerncall_spawn((uintptr_t)func, arg);
+  else
+#endif
+    func(arg);
+
 }

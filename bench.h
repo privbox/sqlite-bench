@@ -17,6 +17,9 @@
 #include <sys/time.h>
 #include <time.h>
 #include <sqlite3.h>
+#ifdef KERNCALL
+#include <sys/kerncall.h>
+#endif // KERNCALL
 
 #define kNumBuckets 154
 #define kNumData 1000000
@@ -61,52 +64,56 @@ typedef struct RandomGenerator {
 //   readseq       -- read N times sequentially
 //   readrandom    -- read N times in random order
 //   readrand100K  -- read N/1000 100K values in sequential order in async mode
-char* FLAGS_benchmarks;
+extern char* FLAGS_benchmarks;
 
 // Number of key/values to place in database
-int FLAGS_num;
+extern int FLAGS_num;
 
 // Number of read operations to do.  If negative, do FLAGS_num reads.
-int FLAGS_reads;
+extern int FLAGS_reads;
 
 // Size of each value
-int FLAGS_value_size;
+extern int FLAGS_value_size;
 
 // Print histogram of operation timings
-bool FLAGS_histogram;
+extern bool FLAGS_histogram;
 
 // Print raw data
-bool FLAGS_raw;
+extern bool FLAGS_raw;
 
 // Arrange to generate values that shrink to this fraction of
 // their original size after compression
-double FLAGS_compression_ratio;
+extern double FLAGS_compression_ratio;
 
 // Page size. Default 1 KB.
-int FLAGS_page_size;
+extern int FLAGS_page_size;
 
 // Number of pages.
 // Default cache size = FLAGS_page_size * FLAGS_num_pages = 4 MB.
-int FLAGS_num_pages;
+extern int FLAGS_num_pages;
 
 // If true, do not destroy the existing database.  If you set this
 // flag and also specify a benchmark that wants a fresh database, that
 // benchmark will fail.
-bool FLAGS_use_existing_db;
+extern bool FLAGS_use_existing_db;
 
 // If true, we allow batch writes to occur
-bool FLAGS_transaction;
+extern bool FLAGS_transaction;
 
 // If true, we enable Write-Ahead Logging
-bool FLAGS_WAL_enabled;
+extern bool FLAGS_WAL_enabled;
 
 // Use the db with the following name.
-char* FLAGS_db;
+extern char* FLAGS_db;
+
+
+// If true, use kerncall to invoke the benchmark code.
+extern int FLAGS_kerncall;
 
 /* benchmark.c */
-void benchmark_init(void);
-void benchmark_fini(void);
-void benchmark_run(void);
+void benchmark_init(long unused);
+void benchmark_fini(long unused);
+void benchmark_run(long unused);
 void benchmark_open(void);
 void benchmark_write(bool, int, int, int, int, int);
 void benchmark_read(int, int);
@@ -135,5 +142,7 @@ char* rand_gen_generate(RandomGenerator*, int);
 uint64_t now_micros(void);
 bool starts_with(const char*, const char*);
 char* trim_space(const char*);
+
+void cond_kerncall(int cond, void (*func)(long), long arg);
 
 #endif /* BENCH_H_ */

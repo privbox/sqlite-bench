@@ -4,6 +4,66 @@
 
 #include "bench.h"
 
+// Comma-separated list of operations to run in the specified order
+//   Actual benchmarks:
+//
+//   fillseq       -- write N values in sequential key order in async mode
+//   fillseqsync   -- write N/100 values in sequential key order in sync mode
+//   fillseqbatch  -- batch write N values in sequential key order in async mode
+//   fillrandom    -- write N values in random key order in async mode
+//   fillrandsync  -- write N/100 values in random key order in sync mode
+//   fillrandbatch -- batch write N values in sequential key order in async mode
+//   overwrite     -- overwrite N values in random key order in async mode
+//   fillrand100K  -- write N/1000 100K values in random order in async mode
+//   fillseq100K   -- write N/1000 100K values in sequential order in async mode
+//   readseq       -- read N times sequentially
+//   readrandom    -- read N times in random order
+//   readrand100K  -- read N/1000 100K values in sequential order in async mode
+char* FLAGS_benchmarks;
+
+// Number of key/values to place in database
+int FLAGS_num;
+
+// Number of read operations to do.  If negative, do FLAGS_num reads.
+int FLAGS_reads;
+
+// Size of each value
+int FLAGS_value_size;
+
+// Print histogram of operation timings
+bool FLAGS_histogram;
+
+// Print raw data
+bool FLAGS_raw;
+
+// Arrange to generate values that shrink to this fraction of
+// their original size after compression
+double FLAGS_compression_ratio;
+
+// Page size. Default 1 KB.
+int FLAGS_page_size;
+
+// Number of pages.
+// Default cache size = FLAGS_page_size * FLAGS_num_pages = 4 MB.
+int FLAGS_num_pages;
+
+// If true, do not destroy the existing database.  If you set this
+// flag and also specify a benchmark that wants a fresh database, that
+// benchmark will fail.
+bool FLAGS_use_existing_db;
+
+// If true, we allow batch writes to occur
+bool FLAGS_transaction;
+
+// If true, we enable Write-Ahead Logging
+bool FLAGS_WAL_enabled;
+
+// Use the db with the following name.
+char* FLAGS_db;
+
+// If true, use kerncall to invoke the benchmark code.
+int FLAGS_kerncall;
+
 void init() {
   // Comma-separated list of operations to run in the specified order
   //   Actual benchmarks:
@@ -48,6 +108,7 @@ void init() {
   FLAGS_transaction = true;
   FLAGS_WAL_enabled = true;
   FLAGS_db = NULL;
+  FLAGS_kerncall = 0;
 }
 
 void print_usage(const char* argv0) {
@@ -67,6 +128,7 @@ void print_usage(const char* argv0) {
   fprintf(stderr, "  --num_pages=INT\t\tnumber of pages\n");
   fprintf(stderr, "  --WAL_enabled={0,1}\t\tenable WAL\n");
   fprintf(stderr, "  --db=PATH\t\t\tpath to location databases are created\n");
+  fprintf(stderr, "  --kerncall\t\t\tuser kerncall mechanism\n");
   fprintf(stderr, "  --help\t\t\tshow this help\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "[BENCH]\n");
@@ -83,6 +145,12 @@ void print_usage(const char* argv0) {
   fprintf(stderr, "  readrandom\tread N times in random order\n");
   fprintf(stderr, "  readrand100K\tread N/1000 100K values in sequential order in async mode\n");
 
+}
+
+static void run_benchmark(long arg) {
+  cond_kerncall(FLAGS_kerncall == 10, benchmark_init, 0);
+  cond_kerncall(FLAGS_kerncall == 11, benchmark_run, 0);
+  cond_kerncall(FLAGS_kerncall == 12, benchmark_fini, 0);
 }
 
 int main(int argc, char** argv) {
@@ -103,7 +171,7 @@ int main(int argc, char** argv) {
     } else if (sscanf(argv[i], "--raw=%d%c", &n, &junk) == 1 &&
                (n == 0 || n == 1)) {
       FLAGS_raw = n;
-    } else if (sscanf(argv[i], "--compression_ratio=%lf%c", &d, &junk) == 1) {
+      } else if (sscanf(argv[i], "--compression_ratio=%lf%c", &d, &junk) == 1) {
       FLAGS_compression_ratio = d;
     } else if (sscanf(argv[i], "--use_existing_db=%d%c", &n, &junk) == 1 &&
                (n == 0 || n == 1)) {
@@ -125,6 +193,8 @@ int main(int argc, char** argv) {
       FLAGS_WAL_enabled = n;
     } else if (strncmp(argv[i], "--db=", 5) == 0) {
       FLAGS_db = argv[i] + 5;
+    } else if (sscanf(argv[i], "--kerncall=%d%c", &n, &junk) == 1) {
+      FLAGS_kerncall = n;
     } else if (!strcmp(argv[i], "--help")) {
       print_usage(argv[0]);
       exit(0);
@@ -137,10 +207,11 @@ int main(int argc, char** argv) {
   /* Choose a location for the test database if none given with --db=<path>  */
   if (FLAGS_db == NULL)
       FLAGS_db = default_db_path;
+#ifdef KERNCALL
+  if (FLAGS_kerncall)
+    kerncall_setup();
+#endif // KERNCALL
 
-  benchmark_init();
-  benchmark_run();
-  benchmark_fini();
-
+  cond_kerncall(FLAGS_kerncall == 1, run_benchmark, 0);
   return 0;
 }
